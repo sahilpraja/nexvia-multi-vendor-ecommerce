@@ -1,0 +1,313 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  VENDOR
+  ADMIN
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum SubOrderStatus {
+  PLACED
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PayoutStatus {
+  PENDING
+  TRANSFERRED
+  REFUNDED
+}
+
+enum CouponType {
+  PERCENT
+  FLAT
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  role         Role          @default(CUSTOMER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  vendorProfile      VendorProfile?
+  addresses          Address[]
+  orders             Order[]
+  reviews            Review[]
+  refreshTokens      RefreshToken[]
+  couponRedemptions  CouponRedemption[]
+
+  @@map("users")
+}
+
+model VendorProfile {
+  id              String        @id @default(uuid())
+  userId          String        @unique
+  storeName       String
+  description     String?
+  status          VendorStatus  @default(PENDING)
+  payoutAccountId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products     Product[]
+  subOrders    SubOrder[]
+  payoutLedger PayoutLedger[]
+
+  @@map("vendor_profiles")
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  name      String
+  slug      String     @unique
+  parentId  String?
+  createdAt DateTime   @default(now())
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String        @id @default(uuid())
+  vendorId    String
+  categoryId  String
+  title       String
+  description String
+  price       Decimal       @db.Decimal(10, 2)
+  stock       Int           @default(0)
+  sku         String        @unique
+  status      ProductStatus @default(DRAFT)
+  avgRating   Float         @default(0.0)
+  reviewCount Int           @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  vendor     VendorProfile  @relation(fields: [vendorId], references: [id])
+  category   Category       @relation(fields: [categoryId], references: [id])
+  images     ProductImage[]
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("US")
+  phone      String
+  createdAt  DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+model Order {
+  id            String        @id @default(uuid())
+  customerId    String
+  addressId     String
+  subtotal      Decimal       @db.Decimal(10, 2)
+  discount      Decimal       @default(0.00) @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  couponId      String?
+  paymentStatus PaymentStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  customer          User               @relation(fields: [customerId], references: [id])
+  address           Address            @relation(fields: [addressId], references: [id])
+  coupon            Coupon?            @relation(fields: [couponId], references: [id])
+  subOrders         SubOrder[]
+  payment           Payment?
+  couponRedemptions CouponRedemption[]
+
+  @@index([customerId])
+  @@map("orders")
+}
+
+model SubOrder {
+  id          String         @id @default(uuid())
+  orderId     String
+  vendorId    String
+  subtotal    Decimal        @db.Decimal(10, 2)
+  status      SubOrderStatus @default(PLACED)
+  packedAt    DateTime?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor       VendorProfile @relation(fields: [vendorId], references: [id])
+  orderItems   OrderItem[]
+  payoutLedger PayoutLedger?
+
+  @@index([vendorId, status])
+  @@map("sub_orders")
+}
+
+model OrderItem {
+  id            String   @id @default(uuid())
+  subOrderId    String
+  productId     String
+  titleSnapshot String
+  priceSnapshot Decimal  @db.Decimal(10, 2)
+  quantity      Int
+  createdAt     DateTime @default(now())
+
+  subOrder SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  orderId           String        @unique
+  providerPaymentId String?       @unique
+  amount            Decimal       @db.Decimal(10, 2)
+  status            PaymentStatus @default(PENDING)
+  rawPayload        Json?
+  createdAt         DateTime      @default(now())
+
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payoutLedger PayoutLedger[]
+
+  @@map("payments")
+}
+
+model PayoutLedger {
+  id          String       @id @default(uuid())
+  paymentId   String
+  subOrderId  String       @unique
+  vendorId    String
+  gross       Decimal      @db.Decimal(10, 2)
+  commission  Decimal      @db.Decimal(10, 2)
+  net         Decimal      @db.Decimal(10, 2)
+  status      PayoutStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+
+  payment  Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  subOrder SubOrder      @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  vendor   VendorProfile @relation(fields: [vendorId], references: [id])
+
+  @@map("payout_ledgers")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@map("reviews")
+}
+
+model Coupon {
+  id          String     @id @default(uuid())
+  code        String     @unique
+  type        CouponType @default(PERCENT)
+  value       Decimal    @db.Decimal(10, 2)
+  minOrder    Decimal    @default(0.00) @db.Decimal(10, 2)
+  maxDiscount Decimal?   @db.Decimal(10, 2)
+  usageLimit  Int?
+  perUserLimit Int       @default(1)
+  expiresAt   DateTime?
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  orders      Order[]
+  redemptions CouponRedemption[]
+
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id        String   @id @default(uuid())
+  couponId  String
+  userId    String
+  orderId   String
+  createdAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("coupon_redemptions")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

@@ -1,0 +1,27 @@
+{
+  "name": "multi-vendor-marketplace",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev:server": "npm --workspace=server run dev",
+    "dev:client": "npm --workspace=client run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build:server": "npm --workspace=server run build",
+    "build:client": "npm --workspace=client run build",
+    "build": "npm run build:server && npm run build:client",
+    "test:server": "npm --workspace=server run test",
+    "test": "npm run test:server",
+    "prisma:generate": "npm --workspace=server run prisma:generate",
+    "prisma:migrate": "npm --workspace=server run prisma:migrate",
+    "prisma:seed": "npm --workspace=server run prisma:seed",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
