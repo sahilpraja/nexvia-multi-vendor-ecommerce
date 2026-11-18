@@ -12,7 +12,7 @@ export interface TokenPayload {
 
 export const generateAccessToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.jwt.accessSecret, {
-    expiresIn: config.jwt.accessExpiry,
+    expiresIn: config.jwt.accessExpiry as any,
   });
 };
 

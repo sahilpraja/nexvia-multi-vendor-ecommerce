@@ -94,7 +94,7 @@ export class PaymentService {
     }
 
     // Idempotency check: repeated webhooks do not double-process
-    if (payment.status === 'SUCCESS') {
+    if (payment.status === 'PAID') {
       return { message: 'Payment already processed (idempotent)', payment };
     }
 
@@ -102,11 +102,11 @@ export class PaymentService {
 
     // Atomic split ledger calculation
     return await prisma.$transaction(async (tx) => {
-      // 1. Mark Payment as SUCCESS
+      // 1. Mark Payment as PAID
       const updatedPayment = await tx.payment.update({
         where: { id: payment.id },
         data: {
-          status: 'SUCCESS',
+          status: 'PAID',
           rawPayload: rawPayload || undefined,
         },
       });

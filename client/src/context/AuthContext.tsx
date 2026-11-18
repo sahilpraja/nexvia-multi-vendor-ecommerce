@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(loggedInUser);
   };
 
-  const register = async (name: string, email: string, password: string, role = 'CUSTOMER' as const) => {
+  const register = async (name: string, email: string, password: string, role: 'CUSTOMER' | 'VENDOR' = 'CUSTOMER') => {
     const res = await api.post('/auth/register', { name, email, password, role });
     const { user: registeredUser, accessToken } = res.data.data;
     setAccessToken(accessToken);

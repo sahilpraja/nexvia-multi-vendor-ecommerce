@@ -10,6 +10,7 @@ export interface User {
   name: string;
   role: Role;
   vendorProfile?: VendorProfile;
+  addresses?: Address[];
 }
 
 export interface VendorProfile {
@@ -53,6 +54,7 @@ export interface Product {
   vendor?: VendorProfile;
   images?: ProductImage[];
   imageUrl?: string;
+  reviews?: Review[];
   createdAt: string;
 }
 

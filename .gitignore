@@ -6,3 +6,5 @@ dist
 coverage
 .prisma
 build
+.pgdata
+*.log
