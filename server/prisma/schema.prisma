@@ -167,8 +167,10 @@ model Order {
   subtotal      Decimal       @db.Decimal(10, 2)
   discount      Decimal       @default(0.00) @db.Decimal(10, 2)
   total         Decimal       @db.Decimal(10, 2)
+  currency      String        @default("USD")
   couponId      String?
   paymentStatus PaymentStatus @default(PENDING)
+  orderStatus   String        @default("PENDING")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -220,13 +222,17 @@ model OrderItem {
 }
 
 model Payment {
-  id                String        @id @default(uuid())
-  orderId           String        @unique
-  providerPaymentId String?       @unique
-  amount            Decimal       @db.Decimal(10, 2)
-  status            PaymentStatus @default(PENDING)
-  rawPayload        Json?
-  createdAt         DateTime      @default(now())
+  id                    String        @id @default(uuid())
+  orderId               String        @unique
+  providerPaymentId     String?       @unique
+  stripeSessionId       String?       @unique
+  stripePaymentIntentId String?
+  amount                Decimal       @db.Decimal(10, 2)
+  currency              String        @default("USD")
+  status                PaymentStatus @default(PENDING)
+  rawPayload            Json?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt @default(now())
 
   order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   payoutLedger PayoutLedger[]

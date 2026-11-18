@@ -3,6 +3,72 @@ import { PaymentService } from '../services/payment.service.js';
 import { ApiError, sendResponse } from '../utils/apiResponse.js';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 
+/**
+ * POST /api/payment/create-checkout-session
+ */
+export const createCheckoutSession = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const customerId = req.user!.userId;
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return next(ApiError.badRequest('Order ID is required to initiate Stripe Checkout Session'));
+    }
+
+    const session = await PaymentService.createCheckoutSession(orderId, customerId);
+    return sendResponse(res, 201, true, 'Stripe Checkout Session created', session);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * GET /api/payment/session/:id
+ */
+export const getSessionStatus = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const customerId = req.user!.userId;
+    const { id } = req.params;
+
+    const result = await PaymentService.getSessionStatus(id, customerId);
+    return sendResponse(res, 200, true, 'Payment session status retrieved', result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * POST /api/payment/webhook
+ * Handles incoming events from Stripe
+ */
+export const handleStripeWebhook = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const signature = req.headers['stripe-signature'] as string | undefined;
+    const rawBody = (req as any).rawBody || req.body;
+
+    const result = await PaymentService.processWebhookEvent(rawBody, signature, req.body);
+    return res.status(200).json({ received: true, result });
+  } catch (error: any) {
+    console.error('❌ Stripe Webhook Error:', error.message);
+    return next(error);
+  }
+};
+
+/**
+ * Retained for backward compatibility
+ */
 export const createPaymentIntent = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -16,40 +82,21 @@ export const createPaymentIntent = async (
       return next(ApiError.badRequest('Order ID is required'));
     }
 
-    const intent = await PaymentService.createPaymentIntent(orderId, customerId);
-    return sendResponse(res, 200, true, 'Payment intent created', intent);
+    // Creates checkout session and also returns client info
+    const session = await PaymentService.createCheckoutSession(orderId, customerId);
+    return sendResponse(res, 200, true, 'Payment intent / session created', {
+      paymentId: session.paymentId,
+      providerPaymentId: session.sessionId,
+      clientSecret: `mock_secret_${session.sessionId}`,
+      amount: session.amount,
+      sessionUrl: session.sessionUrl,
+    });
   } catch (error) {
     return next(error);
   }
 };
 
-export const handlePaymentWebhook = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    // In Stripe live/test webhooks, events have type e.g. 'payment_intent.succeeded'
-    // Support both standard Stripe event payload and simulated payload
-    const event = req.body;
-    let paymentIntentId: string | null = null;
-
-    if (event.type === 'payment_intent.succeeded') {
-      paymentIntentId = event.data?.object?.id;
-    } else if (event.paymentIntentId) {
-      paymentIntentId = event.paymentIntentId;
-    }
-
-    if (!paymentIntentId) {
-      return res.status(200).json({ received: true, message: 'Unhandled event type or no payment ID' });
-    }
-
-    const result = await PaymentService.handleSuccessfulPayment(paymentIntentId, event);
-    return sendResponse(res, 200, true, 'Payment processed successfully', result);
-  } catch (error) {
-    return next(error);
-  }
-};
+export const handlePaymentWebhook = handleStripeWebhook;
 
 export const getVendorEarnings = async (
   req: AuthenticatedRequest,

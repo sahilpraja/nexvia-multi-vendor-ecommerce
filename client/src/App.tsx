@@ -11,6 +11,8 @@ import { HomePage } from './pages/HomePage.js';
 import { ProductDetailPage } from './pages/ProductDetailPage.js';
 import { CartPage } from './pages/CartPage.js';
 import { CheckoutPage } from './pages/CheckoutPage.js';
+import { PaymentSuccess } from './pages/PaymentSuccess.js';
+import { PaymentCancel } from './pages/PaymentCancel.js';
 import { OrdersPage } from './pages/OrdersPage.js';
 import { OrderDetailPage } from './pages/OrderDetailPage.js';
 import { LoginPage } from './pages/LoginPage.js';
@@ -51,6 +53,22 @@ export const App: React.FC = () => {
                   element={
                     <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN']}>
                       <CheckoutPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/payment/success"
+                  element={
+                    <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN']}>
+                      <PaymentSuccess />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/payment/cancel"
+                  element={
+                    <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN']}>
+                      <PaymentCancel />
                     </ProtectedRoute>
                   }
                 />

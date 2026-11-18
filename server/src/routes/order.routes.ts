@@ -18,6 +18,7 @@ const router = Router();
 // Customer Orders & Checkout
 router.post('/checkout', authenticate, checkout);
 router.get('/orders', authenticate, listCustomerOrders);
+router.get('/orders/my-orders', authenticate, listCustomerOrders);
 router.get('/orders/:id', authenticate, getOrderById);
 router.post('/orders/:id/cancel', authenticate, cancelOrder);
 router.get('/orders/:id/invoice', authenticate, downloadInvoice);
