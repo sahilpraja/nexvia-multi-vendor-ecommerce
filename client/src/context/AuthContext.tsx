@@ -18,6 +18,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const refreshProfile = async () => {
+    const storedToken = localStorage.getItem('access_token');
+    if (!storedToken) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get('/auth/me');
       setUser(res.data.data);

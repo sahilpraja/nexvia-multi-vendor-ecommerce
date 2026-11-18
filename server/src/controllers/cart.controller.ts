@@ -18,7 +18,7 @@ export const getCart = async (req: AuthenticatedRequest, res: Response, next: Ne
   try {
     const id = getIdentifier(req);
     const cart = await CartService.getCart(id);
-    return sendResponse(res, 200, true, 'Cart retrieved', cart);
+    return sendResponse(res, 200, true, 'Cart retrieved successfully', cart);
   } catch (error) {
     return next(error);
   }
@@ -32,7 +32,7 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
       return next(ApiError.badRequest('Product ID is required'));
     }
     const cart = await CartService.addItem(id, productId, Math.max(1, parseInt(quantity, 10)));
-    return sendResponse(res, 200, true, 'Item added to cart', cart);
+    return sendResponse(res, 201, true, 'Item added to cart', cart);
   } catch (error) {
     return next(error);
   }
@@ -41,12 +41,12 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
 export const updateCartItem = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = getIdentifier(req);
-    const { productId } = req.params;
+    const itemOrProductId = req.params.id || req.params.productId;
     const { quantity } = req.body;
-    if (quantity === undefined) {
+    if (quantity === undefined || quantity === null) {
       return next(ApiError.badRequest('Quantity is required'));
     }
-    const cart = await CartService.updateQuantity(id, productId, parseInt(quantity, 10));
+    const cart = await CartService.updateQuantity(id, itemOrProductId, parseInt(quantity, 10));
     return sendResponse(res, 200, true, 'Cart item updated', cart);
   } catch (error) {
     return next(error);
@@ -56,8 +56,8 @@ export const updateCartItem = async (req: AuthenticatedRequest, res: Response, n
 export const removeCartItem = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = getIdentifier(req);
-    const { productId } = req.params;
-    const cart = await CartService.removeItem(id, productId);
+    const itemOrProductId = req.params.id || req.params.productId;
+    const cart = await CartService.removeItem(id, itemOrProductId);
     return sendResponse(res, 200, true, 'Item removed from cart', cart);
   } catch (error) {
     return next(error);
@@ -68,7 +68,8 @@ export const clearCart = async (req: AuthenticatedRequest, res: Response, next: 
   try {
     const id = getIdentifier(req);
     await CartService.clearCart(id);
-    return sendResponse(res, 200, true, 'Cart cleared');
+    const emptyCart = await CartService.getCart(id);
+    return sendResponse(res, 200, true, 'Cart cleared successfully', emptyCart);
   } catch (error) {
     return next(error);
   }

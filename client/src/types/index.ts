@@ -59,9 +59,14 @@ export interface Product {
 }
 
 export interface EnrichedCartItem {
+  id?: string;
   productId: string;
   title: string;
+  description?: string;
+  sku?: string;
   price: number;
+  originalPrice?: number;
+  discountPercentage?: number;
   quantity: number;
   stock: number;
   vendorId: string;
@@ -73,9 +78,14 @@ export interface EnrichedCartItem {
 }
 
 export interface CartData {
+  id?: string;
   items: EnrichedCartItem[];
   subtotal: number;
+  totalOriginalPrice?: number;
+  productDiscount?: number;
+  deliveryCharges?: number;
   itemCount: number;
+  total?: number;
   hasUnavailableItems: boolean;
 }
 

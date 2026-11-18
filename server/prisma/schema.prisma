@@ -60,6 +60,7 @@ model User {
   updatedAt    DateTime      @updatedAt
 
   vendorProfile      VendorProfile?
+  cart               Cart?
   addresses          Address[]
   orders             Order[]
   reviews            Review[]
@@ -121,6 +122,7 @@ model Product {
   category   Category       @relation(fields: [categoryId], references: [id])
   images     ProductImage[]
   orderItems OrderItem[]
+  cartItems  CartItem[]
   reviews    Review[]
 
   @@index([vendorId])
@@ -310,4 +312,33 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  productId String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+  @@map("cart_items")
 }

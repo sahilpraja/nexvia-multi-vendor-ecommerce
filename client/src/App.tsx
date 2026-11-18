@@ -26,6 +26,7 @@ import { VendorEarningsPage } from './pages/vendor/VendorEarningsPage.js';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.js';
 import { AdminVendorsPage } from './pages/admin/AdminVendorsPage.js';
 import { AdminCouponsPage } from './pages/admin/AdminCouponsPage.js';
+import { CartNotificationToast } from './components/cart/CartNotification.js';
 
 export const App: React.FC = () => {
   return (
@@ -133,6 +134,7 @@ export const App: React.FC = () => {
             </main>
 
             <Footer />
+            <CartNotificationToast />
           </div>
         </CartProvider>
       </AuthProvider>

@@ -1,7 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { CartData } from '../types/index.js';
-import { api } from '../api/client.js';
 import { useAuth } from './AuthContext.js';
+import { useAppDispatch, useAppSelector } from '../redux/store.js';
+import {
+  fetchCart,
+  addToCart as addToCartThunk,
+  updateCartItemQuantity,
+  removeCartItem,
+  clearCart as clearCartThunk,
+} from '../redux/slices/cartSlice.js';
 
 interface CartContextType {
   cart: CartData;
@@ -13,58 +20,41 @@ interface CartContextType {
   refreshCart: () => Promise<void>;
 }
 
-const emptyCart: CartData = {
-  items: [],
-  subtotal: 0,
-  itemCount: 0,
-  hasUnavailableItems: false,
-};
-
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cart, setCart] = useState<CartData>(emptyCart);
-  const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch();
+  const { cart, loading } = useAppSelector((state) => state.cart);
   const { user } = useAuth();
 
+  useEffect(() => {
+    dispatch(fetchCart());
+  }, [dispatch, user]);
+
   const refreshCart = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/cart');
-      setCart(res.data.data);
-    } catch {
-      setCart(emptyCart);
-    } finally {
-      setLoading(false);
-    }
+    await dispatch(fetchCart()).unwrap();
   };
 
-  useEffect(() => {
-    refreshCart();
-  }, [user]);
-
   const addToCart = async (productId: string, quantity = 1) => {
-    const res = await api.post('/cart/items', { productId, quantity });
-    setCart(res.data.data);
+    await dispatch(addToCartThunk({ productId, quantity })).unwrap();
   };
 
   const updateQuantity = async (productId: string, quantity: number) => {
-    const res = await api.patch(`/cart/items/${productId}`, { quantity });
-    setCart(res.data.data);
+    await dispatch(updateCartItemQuantity({ id: productId, quantity })).unwrap();
   };
 
   const removeItem = async (productId: string) => {
-    const res = await api.delete(`/cart/items/${productId}`);
-    setCart(res.data.data);
+    await dispatch(removeCartItem(productId)).unwrap();
   };
 
   const clearCart = async () => {
-    await api.delete('/cart');
-    setCart(emptyCart);
+    await dispatch(clearCartThunk()).unwrap();
   };
 
   return (
-    <CartContext.Provider value={{ cart, loading, addToCart, updateQuantity, removeItem, clearCart, refreshCart }}>
+    <CartContext.Provider
+      value={{ cart, loading, addToCart, updateQuantity, removeItem, clearCart, refreshCart }}
+    >
       {children}
     </CartContext.Provider>
   );

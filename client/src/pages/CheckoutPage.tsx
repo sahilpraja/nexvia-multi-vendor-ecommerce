@@ -45,19 +45,18 @@ export const CheckoutPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // 1. Create Address or use existing
-      // For seamless demo, send address data directly or retrieve user's address
-      // First ensure address exists in DB or create temporary address
+      // 1. Create order with inline address data
       const checkoutRes = await api.post('/checkout', {
-        addressId: (user as any).addresses?.[0]?.id || 'seed-fallback-addr',
+        address: {
+          line1: address.line1,
+          line2: address.line2,
+          city: address.city,
+          state: address.state,
+          postalCode: address.postalCode,
+          country: address.country,
+          phone: address.phone,
+        },
         couponCode,
-      }).catch(async () => {
-        // Fallback: If no address in user profile, send request with mock id handled gracefully
-        const res = await api.post('/checkout', {
-          addressId: 'default',
-          couponCode,
-        });
-        return res;
       });
 
       const { parentOrder } = checkoutRes.data.data;

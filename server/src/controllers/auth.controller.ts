@@ -8,6 +8,7 @@ import {
   hashToken,
 } from '../utils/token.js';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
+import { CartService } from '../services/cart.service.js';
 
 const COOKIE_NAME = 'refreshToken';
 const COOKIE_OPTIONS = {
@@ -122,6 +123,12 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     });
 
     res.cookie(COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
+
+    // Auto-merge guest cart items into authenticated user cart
+    const guestHeader = req.headers['x-guest-session-id'] as string;
+    if (guestHeader) {
+      await CartService.mergeGuestCart(`guest_${guestHeader}`, user.id);
+    }
 
     return sendResponse(res, 200, true, 'Logged in successfully', {
       user: {

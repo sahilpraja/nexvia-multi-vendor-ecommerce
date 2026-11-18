@@ -12,13 +12,27 @@ export const checkout = async (
 ) => {
   try {
     const userId = req.user!.userId;
-    const { addressId, couponCode } = req.body;
+    const { addressId, address, couponCode } = req.body;
 
-    if (!addressId) {
+    let resolvedAddressId = addressId;
+
+    // If inline address data is provided, create it first
+    if (!resolvedAddressId && address) {
+      const { line1, line2, city, state, postalCode, country, phone } = address;
+      if (!line1 || !city || !state || !postalCode || !phone) {
+        return next(ApiError.badRequest('Address requires line1, city, state, postalCode and phone'));
+      }
+      const created = await prisma.address.create({
+        data: { userId, line1, line2: line2 || '', city, state, postalCode, country: country || 'US', phone },
+      });
+      resolvedAddressId = created.id;
+    }
+
+    if (!resolvedAddressId) {
       return next(ApiError.badRequest('Shipping address is required'));
     }
 
-    const orderResult = await OrderService.checkout(userId, addressId, couponCode);
+    const orderResult = await OrderService.checkout(userId, resolvedAddressId, couponCode);
     return sendResponse(res, 201, true, 'Order created successfully', orderResult);
   } catch (error) {
     return next(error);
