@@ -44,9 +44,7 @@ redisClient.on('connect', () => {
 });
 
 redisClient.on('error', (err) => {
-  if (!redisReady) {
-    // only log once
-  }
+  console.error('❌ Redis connection error:', err.message);
 });
 
 redisClient.on('end', () => {
