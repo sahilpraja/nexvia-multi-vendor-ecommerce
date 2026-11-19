@@ -4,6 +4,7 @@ import {
   getMyVendorProfile,
   updateMyVendorProfile,
   listVendorsAdmin,
+  getVendorDetailsAdmin,
   updateVendorStatusAdmin,
 } from '../controllers/vendor.controller.js';
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js';
@@ -28,6 +29,7 @@ router.patch(
 
 // Admin Vendor Approval & Moderation Routes
 router.get('/admin/vendors', authenticate, requireRole(['ADMIN']), listVendorsAdmin);
+router.get('/admin/vendors/:id', authenticate, requireRole(['ADMIN']), getVendorDetailsAdmin);
 router.patch(
   '/admin/vendors/:id/status',
   authenticate,

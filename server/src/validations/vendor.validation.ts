@@ -18,7 +18,8 @@ export const updateVendorProfileSchema = z.object({
 
 export const updateVendorStatusSchema = z.object({
   body: z.object({
-    status: z.enum(['APPROVED', 'SUSPENDED']),
+    status: z.enum(['PENDING', 'APPROVED', 'SUSPENDED', 'REJECTED']),
+    rejectionReason: z.string().optional().nullable(),
   }),
   params: z.object({
     id: z.string().uuid('Invalid vendor ID'),

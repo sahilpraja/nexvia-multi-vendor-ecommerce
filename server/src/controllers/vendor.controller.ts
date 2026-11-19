@@ -99,12 +99,22 @@ export const listVendorsAdmin = async (
 ) => {
   try {
     const status = req.query.status as any;
+    const search = req.query.search as string;
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
-    const limit = Math.min(50, parseInt(req.query.limit as string, 10) || 20);
+    const limit = Math.min(100, parseInt(req.query.limit as string, 10) || 20);
 
     const where: any = {};
-    if (status) {
+    if (status && status !== 'ALL') {
       where.status = status;
+    }
+
+    if (search) {
+      where.OR = [
+        { storeName: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { user: { name: { contains: search, mode: 'insensitive' } } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
     const [total, vendors] = await Promise.all([
@@ -113,7 +123,13 @@ export const listVendorsAdmin = async (
         where,
         include: {
           user: {
-            select: { id: true, name: true, email: true, createdAt: true },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              createdAt: true,
+              addresses: { take: 1, select: { phone: true, city: true, country: true } },
+            },
           },
           _count: {
             select: { products: true, subOrders: true },
@@ -126,13 +142,71 @@ export const listVendorsAdmin = async (
     ]);
 
     return sendResponse(res, 200, true, 'Vendors retrieved', {
-      vendors,
+      vendors: vendors.map((v) => ({
+        ...v,
+        phone: v.user.addresses?.[0]?.phone || null,
+        city: v.user.addresses?.[0]?.city || null,
+        country: v.user.addresses?.[0]?.country || null,
+      })),
       pagination: {
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getVendorDetailsAdmin = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+
+    const vendor = await prisma.vendorProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            createdAt: true,
+            addresses: true,
+          },
+        },
+        products: {
+          take: 20,
+          where: { deletedAt: null },
+          include: {
+            category: { select: { id: true, name: true } },
+            images: { take: 1, orderBy: { position: 'asc' } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        _count: {
+          select: { products: true, subOrders: true },
+        },
+      },
+    });
+
+    if (!vendor) {
+      return next(ApiError.notFound('Vendor profile not found'));
+    }
+
+    return sendResponse(res, 200, true, 'Vendor details retrieved', {
+      ...vendor,
+      phone: vendor.user.addresses?.[0]?.phone || null,
+      products: vendor.products.map((p) => ({
+        ...p,
+        price: Number(p.price),
+      })),
     });
   } catch (error) {
     return next(error);
@@ -146,15 +220,32 @@ export const updateVendorStatusAdmin = async (
 ) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, rejectionReason } = req.body;
+
+    const existing = await prisma.vendorProfile.findUnique({ where: { id } });
+    if (!existing) {
+      return next(ApiError.notFound('Vendor profile not found'));
+    }
 
     const vendor = await prisma.vendorProfile.update({
       where: { id },
-      data: { status },
-      include: { user: { select: { email: true, name: true } } },
+      data: {
+        status,
+        rejectionReason: status === 'REJECTED' ? rejectionReason || 'Application rejected by platform admin' : null,
+      },
+      include: {
+        user: { select: { email: true, name: true } },
+        _count: { select: { products: true, subOrders: true } },
+      },
     });
 
-    return sendResponse(res, 200, true, `Vendor status updated to ${status}`, vendor);
+    return sendResponse(
+      res,
+      200,
+      true,
+      `Vendor status updated to ${status}${status === 'REJECTED' && rejectionReason ? ` (Reason: ${rejectionReason})` : ''}`,
+      vendor
+    );
   } catch (error) {
     return next(error);
   }
