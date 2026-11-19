@@ -1,6 +1,6 @@
 export type Role = 'CUSTOMER' | 'VENDOR' | 'ADMIN';
-export type VendorStatus = 'PENDING' | 'APPROVED' | 'SUSPENDED';
-export type ProductStatus = 'ACTIVE' | 'DRAFT';
+export type VendorStatus = 'PENDING' | 'APPROVED' | 'SUSPENDED' | 'REJECTED';
+export type ProductStatus = 'ACTIVE' | 'DRAFT' | 'PENDING' | 'REJECTED';
 export type SubOrderStatus = 'PLACED' | 'PACKED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
 
@@ -19,6 +19,7 @@ export interface VendorProfile {
   storeName: string;
   description?: string;
   status: VendorStatus;
+  rejectionReason?: string;
   payoutAccountId?: string;
 }
 
@@ -26,8 +27,12 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  description?: string;
+  imageUrl?: string;
+  status?: string;
   parentId?: string;
   children?: Category[];
+  _count?: { products: number };
 }
 
 export interface ProductImage {

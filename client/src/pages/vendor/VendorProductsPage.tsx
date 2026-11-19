@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Search, AlertCircle, CheckCircle, UploadCloud, X } from 'lucide-react';
 import { api } from '../../api/client.js';
-import { Product, Category } from '../../types/index.js';
+import { Product, Category, ProductStatus } from '../../types/index.js';
 
 export const VendorProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -20,7 +20,7 @@ export const VendorProductsPage: React.FC = () => {
     stock: 10,
     sku: '',
     categoryId: '',
-    status: 'ACTIVE' as 'ACTIVE' | 'DRAFT',
+    status: 'ACTIVE' as ProductStatus,
     imageUrl: '',
   });
   const [saving, setSaving] = useState(false);

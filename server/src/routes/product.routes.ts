@@ -6,11 +6,17 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  listAdminProducts,
+  createAdminProduct,
+  updateAdminProduct,
+  updateAdminProductStatus,
+  deleteAdminProduct,
 } from '../controllers/product.controller.js';
 import { presignUpload } from '../controllers/upload.controller.js';
 import {
   authenticate,
   requireApprovedVendor,
+  requireRole,
 } from '../middlewares/auth.middleware.js';
 import { validateRequest } from '../middlewares/validate.middleware.js';
 import {
@@ -51,5 +57,12 @@ router.post(
   validateRequest(presignUploadSchema),
   presignUpload
 );
+
+// ─── Admin Product Management ─────────────────────────────────────────────────
+router.get('/admin/products', authenticate, requireRole(['ADMIN']), listAdminProducts);
+router.post('/admin/products', authenticate, requireRole(['ADMIN']), createAdminProduct);
+router.patch('/admin/products/:id', authenticate, requireRole(['ADMIN']), updateAdminProduct);
+router.patch('/admin/products/:id/status', authenticate, requireRole(['ADMIN']), updateAdminProductStatus);
+router.delete('/admin/products/:id', authenticate, requireRole(['ADMIN']), deleteAdminProduct);
 
 export default router;

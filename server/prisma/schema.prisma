@@ -17,11 +17,14 @@ enum VendorStatus {
   PENDING
   APPROVED
   SUSPENDED
+  REJECTED
 }
 
 enum ProductStatus {
   ACTIVE
   DRAFT
+  PENDING
+  REJECTED
 }
 
 enum PaymentStatus {
@@ -76,6 +79,7 @@ model VendorProfile {
   storeName       String
   description     String?
   status          VendorStatus  @default(PENDING)
+  rejectionReason String?
   payoutAccountId String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -89,11 +93,15 @@ model VendorProfile {
 }
 
 model Category {
-  id        String     @id @default(uuid())
-  name      String
-  slug      String     @unique
-  parentId  String?
-  createdAt DateTime   @default(now())
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  imageUrl    String?
+  status      String     @default("ACTIVE")
+  parentId    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt @default(now())
 
   parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children Category[] @relation("CategoryHierarchy")
