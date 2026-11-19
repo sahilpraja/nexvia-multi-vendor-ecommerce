@@ -163,3 +163,164 @@ export const exportCsv = async (
     return next(error);
   }
 };
+
+export const getDashboardStats = async (
+  _req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const [
+      totalProducts,
+      activeProducts,
+      draftProducts,
+      totalCategories,
+      totalVendors,
+      approvedVendors,
+      pendingVendors,
+      suspendedVendors,
+      gmvResult,
+      totalOrders,
+      recentProducts,
+      recentVendors,
+      pendingVendorsList,
+      categoriesWithCount,
+      allVendorsForChart,
+    ] = await Promise.all([
+      prisma.product.count({ where: { deletedAt: null } }),
+      prisma.product.count({ where: { status: 'ACTIVE', deletedAt: null } }),
+      prisma.product.count({ where: { status: 'DRAFT', deletedAt: null } }),
+      prisma.category.count(),
+      prisma.vendorProfile.count(),
+      prisma.vendorProfile.count({ where: { status: 'APPROVED' } }),
+      prisma.vendorProfile.count({ where: { status: 'PENDING' } }),
+      prisma.vendorProfile.count({ where: { status: 'SUSPENDED' } }),
+      prisma.order.aggregate({
+        where: { paymentStatus: 'PAID' },
+        _sum: { total: true },
+      }),
+      prisma.order.count(),
+      prisma.product.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          vendor: { select: { id: true, storeName: true } },
+          category: { select: { id: true, name: true } },
+          images: { orderBy: { position: 'asc' }, take: 1 },
+        },
+      }),
+      prisma.vendorProfile.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          _count: { select: { products: true, subOrders: true } },
+        },
+      }),
+      prisma.vendorProfile.findMany({
+        where: { status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      }),
+      prisma.category.findMany({
+        take: 6,
+        select: {
+          id: true,
+          name: true,
+          _count: { select: { products: true } },
+        },
+        orderBy: { products: { _count: 'desc' } },
+      }),
+      prisma.vendorProfile.findMany({
+        select: { createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    const productStatusDistribution = [
+      { status: 'Active', count: activeProducts, color: '#10B981' },
+      { status: 'Draft / Inactive', count: draftProducts, color: '#6B7280' },
+    ];
+
+    const vendorStatusDistribution = [
+      { status: 'Approved', count: approvedVendors, color: '#10B981' },
+      { status: 'Pending Review', count: pendingVendors, color: '#F59E0B' },
+      { status: 'Suspended', count: suspendedVendors, color: '#EF4444' },
+    ];
+
+    const vendorRegMap = new Map<string, number>();
+    for (const v of allVendorsForChart) {
+      const dateKey = v.createdAt.toISOString().split('T')[0];
+      vendorRegMap.set(dateKey, (vendorRegMap.get(dateKey) || 0) + 1);
+    }
+    const vendorRegistrationChart = Array.from(vendorRegMap.entries()).map(([date, count]) => ({
+      date,
+      registrations: count,
+    }));
+
+    return sendResponse(res, 200, true, 'Admin dashboard statistics', {
+      products: {
+        total: totalProducts,
+        active: activeProducts,
+        pendingOrDraft: draftProducts,
+        statusDistribution: productStatusDistribution,
+      },
+      categories: {
+        total: totalCategories,
+        topCategories: categoriesWithCount.map((c) => ({
+          id: c.id,
+          name: c.name,
+          productCount: c._count.products,
+        })),
+      },
+      vendors: {
+        total: totalVendors,
+        approved: approvedVendors,
+        pending: pendingVendors,
+        suspended: suspendedVendors,
+        statusDistribution: vendorStatusDistribution,
+        registrationChart: vendorRegistrationChart,
+      },
+      orders: {
+        total: totalOrders,
+        totalRevenue: Math.round(Number(gmvResult._sum.total || 0) * 100) / 100,
+      },
+      recentProducts: recentProducts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        price: Number(p.price),
+        stock: p.stock,
+        status: p.status,
+        sku: p.sku,
+        categoryName: p.category.name,
+        vendorName: p.vendor.storeName,
+        imageUrl: p.images[0]?.url || '',
+        createdAt: p.createdAt,
+      })),
+      recentVendors: recentVendors.map((v) => ({
+        id: v.id,
+        storeName: v.storeName,
+        ownerName: v.user.name,
+        email: v.user.email,
+        status: v.status,
+        productCount: v._count.products,
+        createdAt: v.createdAt,
+      })),
+      pendingVendorsList: pendingVendorsList.map((v) => ({
+        id: v.id,
+        storeName: v.storeName,
+        ownerName: v.user.name,
+        email: v.user.email,
+        status: v.status,
+        createdAt: v.createdAt,
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+

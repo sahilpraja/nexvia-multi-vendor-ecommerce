@@ -5,6 +5,7 @@ import {
   getTopVendors,
   getTopProducts,
   exportCsv,
+  getDashboardStats,
 } from '../controllers/analytics.controller.js';
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js';
 
@@ -13,6 +14,7 @@ const router = Router();
 router.use(authenticate, requireRole(['ADMIN']));
 
 router.get('/admin/analytics/summary', getAnalyticsSummary);
+router.get('/admin/analytics/dashboard-stats', getDashboardStats);
 router.get('/admin/analytics/revenue', getRevenueOverTime);
 router.get('/admin/analytics/top-vendors', getTopVendors);
 router.get('/admin/analytics/top-products', getTopProducts);
