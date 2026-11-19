@@ -27,8 +27,8 @@ export const paymentService = {
     return res.data.data;
   },
 
-  getSessionStatus: async (sessionId: string): Promise<SessionStatusResponse> => {
-    const res = await api.get(`/payment/session/${sessionId}`);
+  getSessionStatus: async (sessionIdOrOrderId: string): Promise<SessionStatusResponse> => {
+    const res = await api.get(`/payment/session/${sessionIdOrOrderId}`);
     return res.data.data;
   },
 
@@ -44,5 +44,55 @@ export const paymentService = {
       },
     });
     return res.data;
+  },
+
+  // Admin APIs
+  getAdminPayments: async (params?: {
+    search?: string;
+    method?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    payments: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> => {
+    const res = await api.get('/admin/payments', { params });
+    return res.data.data;
+  },
+
+  getAdminPaymentStats: async (): Promise<{
+    totalRevenue: number;
+    stripeVolume: number;
+    codCollected: number;
+    codPending: number;
+    failedCount: number;
+    refundsCount: number;
+    refundsTotal: number;
+    totalCount: number;
+    breakdown: {
+      stripePaidCount: number;
+      codPaidCount: number;
+      codPendingCount: number;
+    };
+  }> => {
+    const res = await api.get('/admin/payments/stats');
+    return res.data.data;
+  },
+
+  confirmCodCollection: async (paymentId: string): Promise<any> => {
+    const res = await api.post(`/admin/payments/${paymentId}/confirm-cod`);
+    return res.data.data;
+  },
+
+  refundPayment: async (
+    paymentId: string,
+    data?: { amount?: number; reason?: string }
+  ): Promise<any> => {
+    const res = await api.post(`/admin/payments/${paymentId}/refund`, data);
+    return res.data.data;
   },
 };

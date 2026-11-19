@@ -34,6 +34,7 @@ import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage.js';
 import { AdminVendorsPage } from './pages/admin/AdminVendorsPage.js';
 import { AdminCouponsPage } from './pages/admin/AdminCouponsPage.js';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage.js';
+import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage.js';
 import { CartNotificationToast } from './components/cart/CartNotification.js';
 
 // Customer / Storefront Layout wrapper
@@ -71,6 +72,7 @@ export const App: React.FC = () => {
               <Route path="categories" element={<AdminCategoriesPage />} />
               <Route path="vendors" element={<AdminVendorsPage />} />
               <Route path="orders" element={<AdminOrdersPage />} />
+              <Route path="payments" element={<AdminPaymentsPage />} />
               <Route path="coupons" element={<AdminCouponsPage />} />
             </Route>
 

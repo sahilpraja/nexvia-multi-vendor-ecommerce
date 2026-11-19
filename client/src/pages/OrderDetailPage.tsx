@@ -116,8 +116,9 @@ export const OrderDetailPage: React.FC = () => {
   const statusCfg = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.PENDING;
   const isCancellable =
     order.subOrders?.every((s) => s.status === 'PLACED') &&
-    order.orderStatus === 'PENDING' &&
-    order.paymentStatus !== 'REFUNDED';
+    ['PENDING', 'CONFIRMED'].includes(order.orderStatus) &&
+    order.paymentStatus !== 'REFUNDED' &&
+    order.orderStatus !== 'CANCELLED';
 
   // Timeline step calculation
   const currentStepIndex = STANDARD_STEPS.indexOf(currentStatus);
@@ -333,32 +334,103 @@ export const OrderDetailPage: React.FC = () => {
           </div>
         ))}
 
-        {/* Shipping Address & Order Totals */}
-        {order.address && (
-          <div className="p-6 rounded-3xl bg-gray-50 border border-gray-200 text-xs text-gray-600 flex flex-col sm:flex-row justify-between gap-4">
-            <div className="space-y-1">
+        {/* Shipping Address & Payment Card */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {order.address && (
+            <div className="p-6 rounded-3xl bg-gray-50 border border-gray-200 text-xs text-gray-600 space-y-2">
               <span className="font-bold text-gray-900 uppercase text-[10px] flex items-center">
                 <MapPin className="w-3.5 h-3.5 mr-1 text-blue-600" /> Shipping Destination
               </span>
-              <p className="text-gray-800 font-semibold">{order.address.line1}</p>
+              <p className="text-gray-900 font-semibold">{order.address.line1}</p>
+              {order.address.line2 && <p className="text-gray-700">{order.address.line2}</p>}
               <p>
                 {order.address.city}, {order.address.state} {order.address.postalCode}
               </p>
-              <p className="text-gray-400">Phone: {order.address.phone}</p>
+              <p className="text-gray-400">Recipient Phone: {order.address.phone}</p>
             </div>
+          )}
 
-            <div className="sm:text-right space-y-1">
-              <span className="font-bold text-gray-900 uppercase text-[10px]">Payment Summary</span>
-              <p className="text-gray-500">Subtotal: ${Number(order.subtotal).toFixed(2)}</p>
-              {Number(order.discount) > 0 && (
-                <p className="text-emerald-600 font-bold">Discount: -${Number(order.discount).toFixed(2)}</p>
-              )}
-              <p className="text-base font-black text-gray-900 pt-1">
-                Total: <span className="text-blue-600">${Number(order.total).toFixed(2)}</span>
-              </p>
+          {/* Payment Method & Security Card */}
+          <div className="p-6 rounded-3xl bg-gray-50 border border-gray-200 text-xs text-gray-600 space-y-2">
+            <span className="font-bold text-gray-900 uppercase text-[10px] flex items-center">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600" /> Payment & Transaction
+            </span>
+            <div className="flex justify-between items-center pt-1">
+              <span className="text-gray-500">Method:</span>
+              <span className="font-bold text-gray-900">
+                {order.paymentMethod === 'COD' ? 'Cash on Delivery (COD)' : 'Stripe Online Payment'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Status:</span>
+              <span
+                className={`font-bold px-2 py-0.5 rounded text-[11px] ${
+                  order.paymentStatus === 'PAID'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : order.paymentStatus === 'COD_PENDING'
+                    ? 'bg-amber-100 text-amber-800'
+                    : order.paymentStatus === 'REFUNDED'
+                    ? 'bg-purple-100 text-purple-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
+                {order.paymentStatus}
+              </span>
+            </div>
+            {order.payment?.stripePaymentIntentId && (
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-gray-500">Transaction ID:</span>
+                <span className="font-mono text-gray-700 truncate max-w-[150px]">
+                  {order.payment.stripePaymentIntentId}
+                </span>
+              </div>
+            )}
+            {order.paymentMethod === 'COD' && (
+              <div className="pt-2 border-t border-gray-200/60 text-[11px] text-amber-900 font-medium">
+                {order.payment?.codCollectedAt ? (
+                  <p className="text-emerald-700 font-semibold">
+                    Cash collected on {new Date(order.payment.codCollectedAt).toLocaleDateString()} by{' '}
+                    {order.payment.codCollectedBy || 'Delivery Agent'}
+                  </p>
+                ) : (
+                  <p>Pay exact cash of ${Number(order.total).toFixed(2)} to delivery partner upon receipt.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pricing Summary */}
+        <div className="p-6 rounded-3xl bg-blue-50/40 border border-blue-100 text-xs text-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-blue-900 uppercase text-[10px]">Verified Marketplace Order</span>
+            <span className="text-gray-400">•</span>
+            <span className="text-gray-500 text-xs">All taxes and standard platform processing included</span>
+          </div>
+
+          <div className="sm:text-right space-y-1 w-full sm:w-auto">
+            <div className="flex justify-between sm:justify-end sm:space-x-4">
+              <span className="text-gray-500">Subtotal:</span>
+              <span className="font-semibold text-gray-800">${Number(order.subtotal).toFixed(2)}</span>
+            </div>
+            {Number(order.discount) > 0 && (
+              <div className="flex justify-between sm:justify-end sm:space-x-4 text-emerald-600 font-bold">
+                <span>Discount:</span>
+                <span>-${Number(order.discount).toFixed(2)}</span>
+              </div>
+            )}
+            {Number(order.codCharges) > 0 && (
+              <div className="flex justify-between sm:justify-end sm:space-x-4 text-gray-600">
+                <span>COD Handling:</span>
+                <span>${Number(order.codCharges).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between sm:justify-end sm:space-x-4 pt-1 border-t border-blue-200/50">
+              <span className="text-sm font-black text-gray-900">Final Total:</span>
+              <span className="text-base font-black text-blue-600">${Number(order.total).toFixed(2)}</span>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

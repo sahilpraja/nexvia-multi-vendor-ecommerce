@@ -6,7 +6,8 @@ import { useCart } from '../context/CartContext.js';
 
 export const PaymentSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const sessionId = searchParams.get('session_id');
+  const sessionId = searchParams.get('session_id') || searchParams.get('order_id');
+  const methodParam = searchParams.get('method');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<SessionStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +16,7 @@ export const PaymentSuccess: React.FC = () => {
 
   useEffect(() => {
     if (!sessionId) {
-      setError('No session ID found in verification redirect.');
+      setError('No session or order reference found in verification redirect.');
       setLoading(false);
       return;
     }
@@ -85,23 +86,36 @@ export const PaymentSuccess: React.FC = () => {
   }
 
   const { order } = data;
+  const isCod = order.paymentMethod === 'COD' || data.paymentStatus === 'COD_PENDING';
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
       <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8 sm:p-12 space-y-8">
         {/* Success Header */}
         <div className="text-center space-y-3">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-inner ${
+              isCod ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'
+            }`}
+          >
             <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />
           </div>
-          <span className="inline-block text-[11px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-            Payment Verified & Order Confirmed
+          <span
+            className={`inline-block text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
+              isCod
+                ? 'text-amber-800 bg-amber-50 border-amber-200'
+                : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+            }`}
+          >
+            {isCod ? 'Cash on Delivery – Order Confirmed' : 'Payment Verified & Order Confirmed'}
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-            Thank you for your purchase!
+            {isCod ? 'Order Placed Successfully!' : 'Thank you for your purchase!'}
           </h1>
-          <p className="text-sm text-gray-500">
-            A confirmation receipt has been generated. Your multi-vendor sub-orders have been routed to independent merchants for fulfillment.
+          <p className="text-sm text-gray-500 max-w-lg mx-auto">
+            {isCod
+              ? 'Your multi-vendor order has been confirmed. Please have exact cash ready when your shipment arrives.'
+              : 'A confirmation receipt has been generated. Your multi-vendor sub-orders have been routed to independent merchants for fulfillment.'}
           </p>
         </div>
 
@@ -112,16 +126,30 @@ export const PaymentSuccess: React.FC = () => {
             <span className="font-mono font-bold text-gray-900 truncate block mt-0.5">#{order.id.slice(0, 8)}</span>
           </div>
           <div>
-            <span className="text-gray-400 font-semibold block uppercase tracking-wider text-[10px]">Total Paid</span>
+            <span className="text-gray-400 font-semibold block uppercase tracking-wider text-[10px]">
+              {isCod ? 'Payable on Delivery' : 'Total Paid'}
+            </span>
             <span className="font-bold text-gray-900 block mt-0.5">${Number(order.total).toFixed(2)}</span>
           </div>
           <div>
             <span className="text-gray-400 font-semibold block uppercase tracking-wider text-[10px]">Payment Status</span>
-            <span className="font-bold text-emerald-600 block mt-0.5">{data.paymentStatus}</span>
+            <span
+              className={`font-bold block mt-0.5 ${
+                data.paymentStatus === 'PAID'
+                  ? 'text-emerald-600'
+                  : data.paymentStatus === 'COD_PENDING'
+                  ? 'text-amber-600'
+                  : 'text-gray-700'
+              }`}
+            >
+              {data.paymentStatus}
+            </span>
           </div>
           <div>
             <span className="text-gray-400 font-semibold block uppercase tracking-wider text-[10px]">Payment Method</span>
-            <span className="font-bold text-gray-900 block mt-0.5">Stripe Checkout</span>
+            <span className="font-bold text-gray-900 block mt-0.5">
+              {isCod ? 'Cash on Delivery (COD)' : 'Stripe Checkout'}
+            </span>
           </div>
         </div>
 

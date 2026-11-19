@@ -7,6 +7,7 @@ import {
   Store,
   ShoppingBag,
   Tag,
+  CreditCard,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -59,6 +60,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       label: 'Orders',
       to: '/admin/orders',
       icon: ShoppingBag,
+      badge: null,
+    },
+    {
+      label: 'Payments',
+      to: '/admin/payments',
+      icon: CreditCard,
       badge: null,
     },
     {

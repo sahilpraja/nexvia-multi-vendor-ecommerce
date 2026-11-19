@@ -111,3 +111,99 @@ export const getVendorEarnings = async (
     return next(error);
   }
 };
+
+/**
+ * POST /api/admin/payments/:id/confirm-cod
+ * Admin confirms Cash on Delivery (COD) collection
+ */
+export const confirmCodCollection = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const adminUser = {
+      id: req.user!.userId,
+      email: req.user!.email,
+      name: (req.user as any)?.name || 'Admin',
+    };
+
+    const result = await PaymentService.confirmCodCollection(id, adminUser);
+    return sendResponse(res, 200, true, 'COD payment collection confirmed successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * POST /api/admin/payments/:id/refund
+ * Admin initiates full or partial refund
+ */
+export const refundPayment = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const { amount, reason } = req.body;
+    const adminUser = {
+      id: req.user!.userId,
+      email: req.user!.email,
+      name: (req.user as any)?.name || 'Admin',
+    };
+
+    const result = await PaymentService.refundPayment(id, {
+      amount: amount ? Number(amount) : undefined,
+      reason,
+      adminUser,
+    });
+    return sendResponse(res, 200, true, 'Payment refund processed successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * GET /api/admin/payments
+ * Admin lists all payment records with filters
+ */
+export const getAdminPayments = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { search, method, status, page, limit } = req.query;
+
+    const result = await PaymentService.getAdminPayments({
+      search: search as string,
+      method: method as string,
+      status: status as string,
+      page: page ? parseInt(page as string, 10) : 1,
+      limit: limit ? parseInt(limit as string, 10) : 20,
+    });
+
+    return sendResponse(res, 200, true, 'Payments retrieved successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * GET /api/admin/payments/stats
+ * Admin retrieves summary statistics
+ */
+export const getAdminPaymentStats = async (
+  _req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const stats = await PaymentService.getAdminPaymentStats();
+    return sendResponse(res, 200, true, 'Payment statistics retrieved successfully', stats);
+  } catch (error) {
+    return next(error);
+  }
+};

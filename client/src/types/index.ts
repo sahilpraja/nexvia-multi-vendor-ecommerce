@@ -165,6 +165,23 @@ export interface OrderStatusHistory {
   createdAt: string;
 }
 
+export interface PaymentInfo {
+  id: string;
+  orderId: string;
+  paymentMethod: PaymentMethod;
+  providerPaymentId?: string;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  codCollectedAt?: string;
+  codCollectedBy?: string;
+  refundedAmount?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Order {
   id: string;
   customerId: string;
@@ -181,6 +198,7 @@ export interface Order {
   orderStatus: OrderStatusType;
   courierName?: string;
   trackingNumber?: string;
+  payment?: PaymentInfo;
   subOrders: SubOrder[];
   statusHistories?: OrderStatusHistory[];
   createdAt: string;

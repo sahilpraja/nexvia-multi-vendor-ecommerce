@@ -45,8 +45,19 @@ export const OrdersPage: React.FC = () => {
             >
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-gray-100 gap-2">
                 <div>
-                  <span className="text-xs text-gray-400">Order ID: #{order.id.slice(0, 8)}</span>
-                  <p className="text-xs text-gray-500">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-gray-900">Order #{order.id.slice(0, 8)}</span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                        order.paymentMethod === 'COD'
+                          ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                          : 'bg-blue-100 text-blue-900 border border-blue-200'
+                      }`}
+                    >
+                      {order.paymentMethod === 'COD' ? 'Cash on Delivery' : 'Stripe Online'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
                     Placed on {new Date(order.createdAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -55,12 +66,14 @@ export const OrdersPage: React.FC = () => {
                     className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
                       order.paymentStatus === 'PAID'
                         ? 'bg-green-100 text-green-800'
+                        : order.paymentStatus === 'COD_PENDING'
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
                         : order.paymentStatus === 'REFUNDED'
                         ? 'bg-purple-100 text-purple-800'
-                        : 'bg-amber-100 text-amber-800'
+                        : 'bg-red-100 text-red-800'
                     }`}
                   >
-                    Payment: {order.paymentStatus}
+                    {order.paymentStatus === 'COD_PENDING' ? 'COD: Pay on Handover' : `Payment: ${order.paymentStatus}`}
                   </span>
                   <span className="text-base font-extrabold text-gray-900">
                     ${Number(order.total).toFixed(2)}
