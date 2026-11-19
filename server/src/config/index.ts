@@ -6,7 +6,9 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/marketplace_db?schema=public',
-  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  redisUrl: (process.env.REDIS_URL || 'redis://localhost:6379')
+    .trim()
+    .replace(/^["']|["']$/g, ''),
   elasticsearchUrl: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
   elasticsearchIndex: process.env.ELASTICSEARCH_INDEX || 'products',
   s3: {
