@@ -48,13 +48,12 @@ npm run prisma:migrate
 ```bash
 npm run prisma:seed
 ```
-This populates:
-- 1 Super Admin
-- 4 Independent Vendors (Apex Electronics, Luxe Apparel, Zenith Living, Pulse Athletics)
-- 3 Customers with addresses
-- ~60 Products with images and ratings
-- Coupons (`WELCOME10`, `FLASH50`, `VIP20`)
-- Multi-vendor sample order, payout ledger, and verified reviews
+This creates or updates a small, repeatable demo catalog:
+- 1 admin, 1 customer (with a shipping address), and 1 approved vendor named Wonder
+- 8 active products across audio, computers, home, and fitness categories
+- Product images and ratings for storefront presentation
+
+The demo seed is idempotent: rerunning it updates only the demo accounts, categories, and products identified by the `DEMO-WONDER-*` SKUs. It does not clear existing users, orders, products, or other marketplace data. Run it with `DATABASE_URL` set to the database you intend to populate. The seeded credentials below are for demonstrations only; change them before exposing demo accounts publicly.
 
 ### Step 4: Launch Dev Servers
 ```bash
@@ -70,9 +69,8 @@ npm run dev
 
 | Role | Email | Password | Access Area |
 | :--- | :--- | :--- | :--- |
-| **Customer** | `john@example.com` | `Password123!` | Public Marketplace, Cart, Checkout, My Orders |
-| **Vendor** | `apex@vendors.com` | `Password123!` | Vendor Dashboard, Product Catalog, Sub-Orders, Earnings |
-| **Vendor** | `luxe@vendors.com` | `Password123!` | Vendor Dashboard, Product Catalog, Sub-Orders, Earnings |
+| **Customer** | `customer@example.com` | `Password123!` | Public Marketplace, Cart, Checkout, My Orders |
+| **Vendor (Wonder)** | `wonder@vendors.com` | `Password123!` | Vendor Dashboard, Product Catalog, Sub-Orders, Earnings |
 | **Admin** | `admin@nexvia.com` | `Password123!` | Admin Analytics, Vendor Approvals, Coupons |
 
 ---
