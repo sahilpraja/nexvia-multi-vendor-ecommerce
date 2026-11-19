@@ -2,7 +2,17 @@ export type Role = 'CUSTOMER' | 'VENDOR' | 'ADMIN';
 export type VendorStatus = 'PENDING' | 'APPROVED' | 'SUSPENDED' | 'REJECTED';
 export type ProductStatus = 'ACTIVE' | 'DRAFT' | 'PENDING' | 'REJECTED';
 export type SubOrderStatus = 'PLACED' | 'PACKED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+export type PaymentStatus =
+  | 'PENDING'
+  | 'PAID'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'REFUND_PENDING'
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED'
+  | 'COD_PENDING';
+
+export type PaymentMethod = 'STRIPE' | 'COD';
 
 export interface User {
   id: string;
@@ -96,6 +106,8 @@ export interface CartData {
 
 export interface Address {
   id: string;
+  userId?: string;
+  fullName?: string;
   line1: string;
   line2?: string;
   city: string;
@@ -103,6 +115,9 @@ export interface Address {
   postalCode: string;
   country: string;
   phone: string;
+  isDefault?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface OrderItem {
@@ -160,6 +175,8 @@ export interface Order {
   discount: number;
   total: number;
   currency?: string;
+  paymentMethod?: PaymentMethod;
+  codCharges?: number;
   paymentStatus: PaymentStatus;
   orderStatus: OrderStatusType;
   courierName?: string;

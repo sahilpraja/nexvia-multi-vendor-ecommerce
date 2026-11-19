@@ -11,13 +11,11 @@ import { authenticate, requireRole } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-router.use(authenticate, requireRole(['ADMIN']));
-
-router.get('/admin/analytics/summary', getAnalyticsSummary);
-router.get('/admin/analytics/dashboard-stats', getDashboardStats);
-router.get('/admin/analytics/revenue', getRevenueOverTime);
-router.get('/admin/analytics/top-vendors', getTopVendors);
-router.get('/admin/analytics/top-products', getTopProducts);
-router.get('/admin/analytics/export-csv', exportCsv);
+router.get('/admin/analytics/summary', authenticate, requireRole(['ADMIN']), getAnalyticsSummary);
+router.get('/admin/analytics/dashboard-stats', authenticate, requireRole(['ADMIN']), getDashboardStats);
+router.get('/admin/analytics/revenue', authenticate, requireRole(['ADMIN']), getRevenueOverTime);
+router.get('/admin/analytics/top-vendors', authenticate, requireRole(['ADMIN']), getTopVendors);
+router.get('/admin/analytics/top-products', authenticate, requireRole(['ADMIN']), getTopProducts);
+router.get('/admin/analytics/export-csv', authenticate, requireRole(['ADMIN']), exportCsv);
 
 export default router;

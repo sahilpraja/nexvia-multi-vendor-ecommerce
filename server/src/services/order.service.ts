@@ -41,12 +41,24 @@ const VALID_SUBORDER_TRANSITIONS: Record<SubOrderStatus, SubOrderStatus[]> = {
 };
 
 export class OrderService {
-  static async checkout(userId: string, addressId: string, couponCode?: string) {
+  static async checkout(
+    userId: string,
+    addressId: string,
+    couponCode?: string,
+    paymentMethod: 'STRIPE' | 'COD' = 'STRIPE'
+  ) {
     const address = await prisma.address.findFirst({
       where: { id: addressId, userId },
     });
     if (!address) {
       throw ApiError.badRequest('Invalid shipping address selected');
+    }
+
+    if (paymentMethod === 'COD') {
+      const pin = address.postalCode?.trim();
+      if (!pin || pin.length < 3) {
+        throw ApiError.badRequest('Cash on Delivery is not available for this delivery PIN code');
+      }
     }
 
     const cart = await CartService.getCart(userId);
@@ -99,7 +111,8 @@ export class OrderService {
       couponId = coupon.id;
     }
 
-    const finalTotal = Math.max(0, cart.subtotal - discountAmount);
+    const codCharges = paymentMethod === 'COD' ? 0 : 0;
+    const finalTotal = Math.max(0, cart.subtotal - discountAmount + codCharges);
 
     // Group cart items by vendor
     const itemsByVendor = new Map<string, typeof cart.items>();
@@ -128,6 +141,10 @@ export class OrderService {
         }
       }
 
+      const isCod = paymentMethod === 'COD';
+      const initialPaymentStatus = isCod ? 'COD_PENDING' : 'PENDING';
+      const initialOrderStatus = isCod ? 'CONFIRMED' : 'PENDING';
+
       // 2. Create parent Order
       const parentOrder = await tx.order.create({
         data: {
@@ -137,8 +154,10 @@ export class OrderService {
           discount: discountAmount,
           total: finalTotal,
           couponId,
-          paymentStatus: 'PENDING',
-          orderStatus: 'PENDING',
+          paymentMethod,
+          codCharges,
+          paymentStatus: initialPaymentStatus,
+          orderStatus: initialOrderStatus,
         },
       });
 
@@ -146,13 +165,39 @@ export class OrderService {
       await tx.orderStatusHistory.create({
         data: {
           orderId: parentOrder.id,
-          status: 'PENDING',
-          note: 'Order successfully placed by customer',
+          status: initialOrderStatus,
+          note: isCod
+            ? 'Cash on Delivery (COD) order placed and confirmed'
+            : 'Order initialized — awaiting Stripe online payment',
           updatedBy: 'SYSTEM',
         },
       });
 
-      // 4. Create Sub-Orders per vendor
+      // 4. Create initial Payment record
+      const payment = await tx.payment.create({
+        data: {
+          orderId: parentOrder.id,
+          paymentMethod,
+          amount: finalTotal,
+          currency: 'USD',
+          status: initialPaymentStatus,
+        },
+      });
+
+      // Log initial transaction entry
+      await tx.paymentTransaction.create({
+        data: {
+          paymentId: payment.id,
+          type: isCod ? 'COD_ORDER_PLACED' : 'STRIPE_SESSION_INITIATED',
+          amount: finalTotal,
+          status: initialPaymentStatus,
+          note: isCod
+            ? 'Cash on Delivery order placed by customer'
+            : 'Stripe payment session initiated',
+        },
+      });
+
+      // 5. Create Sub-Orders per vendor
       const createdSubOrders = [];
       for (const [vendorId, vendorItems] of itemsByVendor.entries()) {
         const vendorSubtotal = vendorItems.reduce((acc, i) => acc + i.itemTotal, 0);
@@ -162,7 +207,7 @@ export class OrderService {
             orderId: parentOrder.id,
             vendorId,
             subtotal: vendorSubtotal,
-            status: 'PLACED',
+            status: isCod ? 'PLACED' : 'PLACED',
             orderItems: {
               create: vendorItems.map((item) => ({
                 productId: item.productId,
@@ -178,7 +223,7 @@ export class OrderService {
         createdSubOrders.push(subOrder);
       }
 
-      // 5. Record Coupon Redemption if applicable
+      // 6. Record Coupon Redemption if applicable
       if (couponId) {
         await tx.couponRedemption.create({
           data: {
@@ -189,11 +234,13 @@ export class OrderService {
         });
       }
 
-      return { parentOrder, subOrders: createdSubOrders };
+      return { parentOrder, subOrders: createdSubOrders, payment };
     });
 
-    // Clear cart in Redis/memory after successful order creation
-    await CartService.clearCart(userId);
+    // For COD, order is confirmed immediately -> clear cart now
+    if (paymentMethod === 'COD') {
+      await CartService.clearCart(userId);
+    }
 
     return result;
   }

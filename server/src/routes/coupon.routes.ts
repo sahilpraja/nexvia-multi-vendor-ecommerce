@@ -9,11 +9,9 @@ import { authenticate, requireRole } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-router.use(authenticate, requireRole(['ADMIN']));
-
-router.get('/admin/coupons', listCouponsAdmin);
-router.post('/admin/coupons', createCouponAdmin);
-router.patch('/admin/coupons/:id', updateCouponAdmin);
-router.delete('/admin/coupons/:id', deleteCouponAdmin);
+router.get('/admin/coupons', authenticate, requireRole(['ADMIN']), listCouponsAdmin);
+router.post('/admin/coupons', authenticate, requireRole(['ADMIN']), createCouponAdmin);
+router.patch('/admin/coupons/:id', authenticate, requireRole(['ADMIN']), updateCouponAdmin);
+router.delete('/admin/coupons/:id', authenticate, requireRole(['ADMIN']), deleteCouponAdmin);
 
 export default router;

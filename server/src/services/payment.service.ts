@@ -33,6 +33,12 @@ export class PaymentService {
       throw ApiError.badRequest('Order has already been paid');
     }
 
+    if (order.paymentMethod === 'COD') {
+      throw ApiError.badRequest(
+        'This order was placed using Cash on Delivery (COD) and cannot be paid through Stripe Checkout'
+      );
+    }
+
     // Build line items from order items with real server-side pricing
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
 
@@ -103,6 +109,7 @@ export class PaymentService {
       where: { orderId: order.id },
       create: {
         orderId: order.id,
+        paymentMethod: 'STRIPE',
         providerPaymentId: sessionId,
         stripeSessionId: sessionId,
         stripePaymentIntentId: paymentIntentId,
@@ -111,6 +118,7 @@ export class PaymentService {
         status: 'PENDING',
       },
       update: {
+        paymentMethod: 'STRIPE',
         providerPaymentId: sessionId,
         stripeSessionId: sessionId,
         stripePaymentIntentId: paymentIntentId,

@@ -9,6 +9,7 @@ import paymentRoutes from './payment.routes.js';
 import reviewRoutes from './review.routes.js';
 import couponRoutes from './coupon.routes.js';
 import analyticsRoutes from './analytics.routes.js';
+import addressRoutes from './address.routes.js';
 
 const apiRouter = Router();
 
@@ -31,5 +32,6 @@ apiRouter.use('/', paymentRoutes);
 apiRouter.use('/', reviewRoutes);
 apiRouter.use('/', couponRoutes);
 apiRouter.use('/', analyticsRoutes);
+apiRouter.use('/', addressRoutes);
 
 export default apiRouter;

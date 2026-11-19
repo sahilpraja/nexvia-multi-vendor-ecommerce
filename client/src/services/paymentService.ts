@@ -1,4 +1,5 @@
 import { api } from '../api/client.js';
+import { PaymentStatus, PaymentMethod } from '../types/index.js';
 
 export interface CheckoutSessionResponse {
   sessionId: string;
@@ -15,7 +16,8 @@ export interface SessionStatusResponse {
   orderId: string;
   amount: number;
   currency: string;
-  paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+  paymentStatus: PaymentStatus;
+  paymentMethod?: PaymentMethod;
   order: any;
 }
 
