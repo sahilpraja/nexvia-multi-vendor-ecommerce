@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, CreditCard, Lock, AlertCircle, Truck, Package, ArrowRight, Check } from 'lucide-react';
 import { useCart } from '../context/CartContext.js';
@@ -28,6 +28,10 @@ export const CheckoutPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'stripe'>('stripe');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    refreshCart();
+  }, []);
 
   // Group items by vendor for multi-vendor sub-order review
   const vendorGroups = cart.items.reduce((acc, item) => {
@@ -87,6 +91,7 @@ export const CheckoutPage: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Checkout failed. Please verify cart items and address.');
       setLoading(false);
+      refreshCart();
     }
   };
 
@@ -295,6 +300,13 @@ export const CheckoutPage: React.FC = () => {
                 <span className="text-2xl text-blue-600">${cart.subtotal.toFixed(2)}</span>
               </div>
             </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-2 text-red-700 text-xs">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
             {/* Submit / Pay with Stripe CTA */}
             <button
