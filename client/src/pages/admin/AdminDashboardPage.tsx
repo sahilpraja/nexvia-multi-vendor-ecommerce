@@ -73,6 +73,13 @@ export const AdminDashboardPage: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <Link
+            to="/admin/orders"
+            className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center space-x-1.5"
+          >
+            <ShoppingBag className="w-4 h-4" />
+            <span>Manage Orders</span>
+          </Link>
+          <Link
             to="/admin/vendors"
             className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-semibold text-xs transition flex items-center space-x-1.5"
           >
@@ -88,7 +95,7 @@ export const AdminDashboardPage: React.FC = () => {
           </Link>
           <button
             onClick={handleExportCsv}
-            className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold text-xs shadow-md transition flex items-center space-x-1.5"
+            className="px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-semibold text-xs shadow-sm transition flex items-center space-x-1.5"
           >
             <Download className="w-4 h-4" />
             <span>Export CSV</span>

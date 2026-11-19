@@ -4,7 +4,35 @@ import { SubOrderStatus } from '@prisma/client';
 import { CartService } from './cart.service.js';
 import { config } from '../config/index.js';
 
-const VALID_STATE_TRANSITIONS: Record<SubOrderStatus, SubOrderStatus[]> = {
+export const ORDER_STATUSES = [
+  'PENDING',
+  'CONFIRMED',
+  'PROCESSING',
+  'SHIPPED',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'CANCELLED',
+  'RETURNED',
+  'REFUNDED',
+  'PAYMENT_FAILED',
+] as const;
+
+export type OrderStatusType = typeof ORDER_STATUSES[number];
+
+export const ALLOWED_ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ['CONFIRMED', 'PROCESSING', 'PAYMENT_FAILED', 'CANCELLED'],
+  CONFIRMED: ['PROCESSING', 'CANCELLED'],
+  PROCESSING: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['OUT_FOR_DELIVERY', 'DELIVERED', 'RETURNED', 'CANCELLED'],
+  OUT_FOR_DELIVERY: ['DELIVERED', 'RETURNED', 'CANCELLED'],
+  DELIVERED: ['RETURNED', 'REFUNDED'],
+  RETURNED: ['REFUNDED'],
+  CANCELLED: ['REFUNDED'],
+  PAYMENT_FAILED: ['PENDING', 'CANCELLED'],
+  REFUNDED: [],
+};
+
+const VALID_SUBORDER_TRANSITIONS: Record<SubOrderStatus, SubOrderStatus[]> = {
   PLACED: ['PACKED', 'CANCELLED'],
   PACKED: ['SHIPPED'],
   SHIPPED: ['DELIVERED'],
@@ -85,7 +113,6 @@ export class OrderService {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Lock and decrement stock for every product
       for (const item of cart.items) {
-        // Row-level lock via raw query or atomic decrement with condition
         const updated = await tx.product.updateMany({
           where: {
             id: item.productId,
@@ -111,10 +138,21 @@ export class OrderService {
           total: finalTotal,
           couponId,
           paymentStatus: 'PENDING',
+          orderStatus: 'PENDING',
         },
       });
 
-      // 3. Create Sub-Orders per vendor
+      // 3. Create initial OrderStatusHistory entry
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: parentOrder.id,
+          status: 'PENDING',
+          note: 'Order successfully placed by customer',
+          updatedBy: 'SYSTEM',
+        },
+      });
+
+      // 4. Create Sub-Orders per vendor
       const createdSubOrders = [];
       for (const [vendorId, vendorItems] of itemsByVendor.entries()) {
         const vendorSubtotal = vendorItems.reduce((acc, i) => acc + i.itemTotal, 0);
@@ -140,7 +178,7 @@ export class OrderService {
         createdSubOrders.push(subOrder);
       }
 
-      // 4. Record Coupon Redemption if applicable
+      // 5. Record Coupon Redemption if applicable
       if (couponId) {
         await tx.couponRedemption.create({
           data: {
@@ -154,10 +192,244 @@ export class OrderService {
       return { parentOrder, subOrders: createdSubOrders };
     });
 
-    // Clear cart in Redis after successful order creation
+    // Clear cart in Redis/memory after successful order creation
     await CartService.clearCart(userId);
 
     return result;
+  }
+
+  /**
+   * Admin: List all orders with searching, status filtering, and count metrics
+   */
+  static async listAdminOrders(params: {
+    search?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { search, status, page = 1, limit = 50 } = params;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    // Filter by specific order status
+    if (status && status !== 'ALL') {
+      where.orderStatus = status;
+    }
+
+    // Search by Order ID, Customer Name, or Customer Email
+    if (search && search.trim() !== '') {
+      const q = search.trim();
+      where.OR = [
+        { id: { contains: q, mode: 'insensitive' } },
+        { customer: { name: { contains: q, mode: 'insensitive' } } },
+        { customer: { email: { contains: q, mode: 'insensitive' } } },
+        { trackingNumber: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [orders, total, allStatuses] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          customer: { select: { id: true, name: true, email: true } },
+          address: true,
+          payment: true,
+          subOrders: {
+            include: {
+              vendor: { select: { id: true, storeName: true } },
+              orderItems: true,
+            },
+          },
+          statusHistories: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.order.count({ where }),
+      prisma.order.groupBy({
+        by: ['orderStatus'],
+        _count: { _all: true },
+      }),
+    ]);
+
+    // Build status count breakdown map for admin dashboard filter pills
+    const statusCounts: Record<string, number> = { ALL: 0 };
+    for (const s of ORDER_STATUSES) {
+      statusCounts[s] = 0;
+    }
+    for (const item of allStatuses) {
+      statusCounts[item.orderStatus] = item._count._all;
+      statusCounts.ALL += item._count._all;
+    }
+
+    return {
+      orders,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      statusCounts,
+      availableStatuses: ORDER_STATUSES,
+    };
+  }
+
+  /**
+   * Admin: Get single order by ID with complete relations
+   */
+  static async getAdminOrderById(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: { select: { id: true, name: true, email: true } },
+        address: true,
+        payment: true,
+        subOrders: {
+          include: {
+            vendor: { select: { id: true, storeName: true } },
+            orderItems: true,
+          },
+        },
+        statusHistories: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw ApiError.notFound(`Order with ID ${orderId} not found`);
+    }
+
+    return order;
+  }
+
+  /**
+   * Admin: Update order status with validation, transition checking, courier details, and history logging
+   */
+  static async updateOrderStatusByAdmin(
+    orderId: string,
+    data: {
+      status: string;
+      courierName?: string;
+      trackingNumber?: string;
+      note?: string;
+      force?: boolean;
+    },
+    adminUser: { id: string; name?: string; email?: string }
+  ) {
+    const { status, courierName, trackingNumber, note, force = false } = data;
+
+    // 1. Validate that status is in the allowed enum set
+    if (!ORDER_STATUSES.includes(status as any)) {
+      throw ApiError.badRequest(
+        `Invalid status "${status}". Allowed statuses: ${ORDER_STATUSES.join(', ')}`
+      );
+    }
+
+    // 2. Fetch existing order
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        subOrders: {
+          include: { orderItems: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw ApiError.notFound('Order not found');
+    }
+
+    const currentStatus = order.orderStatus || 'PENDING';
+
+    // 3. Status transition validation
+    if (!force && currentStatus !== status) {
+      const allowedNext = ALLOWED_ORDER_STATUS_TRANSITIONS[currentStatus] || [];
+      if (!allowedNext.includes(status)) {
+        throw ApiError.badRequest(
+          `Invalid status transition from "${currentStatus}" to "${status}". Allowed transitions: ${
+            allowedNext.length > 0 ? allowedNext.join(', ') : 'None (Terminal state)'
+          }`
+        );
+      }
+    }
+
+    // 4. Atomic update in transaction
+    const updated = await prisma.$transaction(async (tx) => {
+      // Determine payment status adjustment if order is cancelled or refunded
+      let paymentStatusUpdate = order.paymentStatus;
+      if (status === 'REFUNDED') {
+        paymentStatusUpdate = 'REFUNDED';
+      } else if (status === 'CANCELLED' && order.paymentStatus === 'PAID') {
+        paymentStatusUpdate = 'REFUNDED';
+      } else if (status === 'PAYMENT_FAILED') {
+        paymentStatusUpdate = 'FAILED';
+      }
+
+      // If cancelled and was not already cancelled, restore product stock
+      if (status === 'CANCELLED' && currentStatus !== 'CANCELLED') {
+        for (const sub of order.subOrders) {
+          for (const item of sub.orderItems) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: item.quantity } },
+            });
+          }
+        }
+      }
+
+      // Update parent Order
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          orderStatus: status,
+          paymentStatus: paymentStatusUpdate,
+          courierName: courierName !== undefined ? courierName : order.courierName,
+          trackingNumber: trackingNumber !== undefined ? trackingNumber : order.trackingNumber,
+        },
+      });
+
+      // Synchronize sub-orders according to business lifecycle
+      if (status === 'SHIPPED') {
+        await tx.subOrder.updateMany({
+          where: { orderId, status: { in: ['PLACED', 'PACKED'] } },
+          data: { status: 'SHIPPED', shippedAt: new Date() },
+        });
+      } else if (status === 'DELIVERED') {
+        await tx.subOrder.updateMany({
+          where: { orderId, status: { not: 'CANCELLED' } },
+          data: { status: 'DELIVERED', deliveredAt: new Date() },
+        });
+      } else if (status === 'CANCELLED') {
+        await tx.subOrder.updateMany({
+          where: { orderId },
+          data: { status: 'CANCELLED' },
+        });
+        await tx.payoutLedger.updateMany({
+          where: { subOrder: { orderId } },
+          data: { status: 'REFUNDED' },
+        });
+      }
+
+      // Record Order Status History Entry
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          status,
+          courierName: courierName || order.courierName,
+          trackingNumber: trackingNumber || order.trackingNumber,
+          note: note || `Status updated from ${currentStatus} to ${status} by Admin`,
+          updatedBy: adminUser.name || adminUser.email || 'Admin',
+        },
+      });
+
+      return updatedOrder;
+    });
+
+    return this.getAdminOrderById(orderId);
   }
 
   static async advanceSubOrderStatus(
@@ -178,7 +450,7 @@ export class OrderService {
       throw ApiError.forbidden('You can only update your own sub-orders');
     }
 
-    const allowedNext = VALID_STATE_TRANSITIONS[subOrder.status];
+    const allowedNext = VALID_SUBORDER_TRANSITIONS[subOrder.status];
     if (!allowedNext.includes(newStatus)) {
       throw ApiError.badRequest(
         `Invalid status transition from "${subOrder.status}" to "${newStatus}". Allowed transitions: ${allowedNext.join(', ') || 'None'}`
@@ -244,7 +516,19 @@ export class OrderService {
 
       await tx.order.update({
         where: { id: order.id },
-        data: { paymentStatus: 'REFUNDED' },
+        data: {
+          orderStatus: 'CANCELLED',
+          paymentStatus: order.paymentStatus === 'PAID' ? 'REFUNDED' : order.paymentStatus,
+        },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: 'CANCELLED',
+          note: 'Order cancelled by customer',
+          updatedBy: 'CUSTOMER',
+        },
       });
 
       return { message: 'Order successfully cancelled and stock restored' };

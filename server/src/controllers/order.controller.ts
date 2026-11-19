@@ -56,6 +56,9 @@ export const listCustomerOrders = async (
             orderItems: true,
           },
         },
+        statusHistories: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -79,6 +82,7 @@ export const getOrderById = async (
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
+        customer: { select: { id: true, name: true, email: true } },
         address: true,
         subOrders: {
           include: {
@@ -86,16 +90,19 @@ export const getOrderById = async (
             orderItems: true,
           },
         },
+        statusHistories: {
+          orderBy: { createdAt: 'desc' },
+        },
         payment: true,
       },
     });
 
     if (!order) {
-      return next(ApiError.notFound('Order not found'));
+      throw ApiError.notFound('Order not found');
     }
 
     if (!isAdmin && order.customerId !== userId) {
-      return next(ApiError.forbidden('You are not authorized to view this order'));
+      throw ApiError.forbidden('You are not authorized to view this order');
     }
 
     return sendResponse(res, 200, true, 'Order retrieved', order);
@@ -191,6 +198,85 @@ export const updateSubOrderStatus = async (
 
     const updated = await OrderService.advanceSubOrderStatus(id, vendorId, status);
     return sendResponse(res, 200, true, `Sub-order status updated to ${status}`, updated);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/* =========================================================================
+   ADMIN ORDER MANAGEMENT CONTROLLER ENDPOINTS
+========================================================================= */
+
+/**
+ * GET /api/v1/admin/orders
+ * Admin: List all customer orders with searching and filtering
+ */
+export const listAdminOrders = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const search = req.query.search as string | undefined;
+    const status = req.query.status as string | undefined;
+    const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+
+    const result = await OrderService.listAdminOrders({ search, status, page, limit });
+    return sendResponse(res, 200, true, 'Admin orders retrieved successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * GET /api/v1/admin/orders/:id
+ * Admin: Get complete order details with history & customer address
+ */
+export const getAdminOrderById = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const order = await OrderService.getAdminOrderById(id);
+    return sendResponse(res, 200, true, 'Order details retrieved', order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * PATCH /api/v1/admin/orders/:id/status
+ * Admin: Update order status, courier info, tracking number, and append history
+ */
+export const updateAdminOrderStatus = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const { status, courierName, trackingNumber, note, force } = req.body;
+
+    if (!status) {
+      return next(ApiError.badRequest('Status is required'));
+    }
+
+    const adminUser = {
+      id: req.user!.userId,
+      email: req.user!.email,
+      name: (req.user as any).name || 'Admin',
+    };
+
+    const updatedOrder = await OrderService.updateOrderStatusByAdmin(
+      id,
+      { status, courierName, trackingNumber, note, force },
+      adminUser
+    );
+
+    return sendResponse(res, 200, true, `Order status successfully updated to ${status}`, updatedOrder);
   } catch (error) {
     return next(error);
   }

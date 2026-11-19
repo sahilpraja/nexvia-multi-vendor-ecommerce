@@ -122,17 +122,47 @@ export interface SubOrder {
   createdAt: string;
 }
 
+export type OrderStatusType =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PROCESSING'
+  | 'SHIPPED'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'RETURNED'
+  | 'REFUNDED'
+  | 'PAYMENT_FAILED';
+
+export interface OrderStatusHistory {
+  id: string;
+  orderId: string;
+  status: OrderStatusType;
+  courierName?: string;
+  trackingNumber?: string;
+  note?: string;
+  updatedBy?: string;
+  createdAt: string;
+}
+
 export interface Order {
   id: string;
   customerId: string;
+  customer?: { id: string; name: string; email: string };
   addressId: string;
   address: Address;
   subtotal: number;
   discount: number;
   total: number;
+  currency?: string;
   paymentStatus: PaymentStatus;
+  orderStatus: OrderStatusType;
+  courierName?: string;
+  trackingNumber?: string;
   subOrders: SubOrder[];
+  statusHistories?: OrderStatusHistory[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Review {

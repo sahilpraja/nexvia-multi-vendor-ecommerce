@@ -1,8 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Download, CheckCircle, Package, Truck, Home, AlertCircle, Ban } from 'lucide-react';
+import {
+  ArrowLeft,
+  Download,
+  CheckCircle,
+  Package,
+  Truck,
+  AlertCircle,
+  Ban,
+  Clock,
+  RotateCcw,
+  XCircle,
+  ShieldCheck,
+  History,
+  Copy,
+  Check,
+  ExternalLink,
+  MapPin,
+} from 'lucide-react';
 import { api } from '../api/client.js';
-import { Order, SubOrderStatus } from '../types/index.js';
+import { Order, OrderStatusType } from '../types/index.js';
+
+const STATUS_CONFIG: Record<
+  OrderStatusType,
+  { label: string; bg: string; text: string; border: string; icon: React.ComponentType<any> }
+> = {
+  PENDING: { label: 'Pending', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Clock },
+  CONFIRMED: { label: 'Confirmed', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: CheckCircle },
+  PROCESSING: { label: 'Processing', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Package },
+  SHIPPED: { label: 'Shipped', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: Truck },
+  OUT_FOR_DELIVERY: { label: 'Out for Delivery', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: Truck },
+  DELIVERED: { label: 'Delivered', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle },
+  CANCELLED: { label: 'Cancelled', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: XCircle },
+  RETURNED: { label: 'Returned', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', icon: RotateCcw },
+  REFUNDED: { label: 'Refunded', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', icon: RotateCcw },
+  PAYMENT_FAILED: { label: 'Payment Failed', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', icon: AlertCircle },
+};
+
+const STANDARD_STEPS: OrderStatusType[] = [
+  'PENDING',
+  'CONFIRMED',
+  'PROCESSING',
+  'SHIPPED',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+];
 
 export const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -10,9 +52,11 @@ export const OrderDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
+  const [copiedTracking, setCopiedTracking] = useState(false);
 
   const fetchOrder = () => {
-    api.get(`/orders/${id}`)
+    api
+      .get(`/orders/${id}`)
       .then((res) => setOrder(res.data.data))
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
@@ -42,6 +86,13 @@ export const OrderDetailPage: React.FC = () => {
     }
   };
 
+  const handleCopyTracking = () => {
+    if (!order?.trackingNumber) return;
+    navigator.clipboard.writeText(order.trackingNumber);
+    setCopiedTracking(true);
+    setTimeout(() => setCopiedTracking(false), 2000);
+  };
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center">
@@ -54,13 +105,23 @@ export const OrderDetailPage: React.FC = () => {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center">
         <h2 className="text-xl font-bold text-gray-800">Order not found</h2>
-        <Link to="/orders" className="text-blue-600 underline mt-2 inline-block">Return to Orders</Link>
+        <Link to="/orders" className="text-blue-600 underline mt-2 inline-block">
+          Return to Orders
+        </Link>
       </div>
     );
   }
 
-  // Check if eligible for customer cancellation (all sub-orders PLACED)
-  const isCancellable = order.subOrders.every((s) => s.status === 'PLACED') && order.paymentStatus !== 'REFUNDED';
+  const currentStatus = order.orderStatus || 'PENDING';
+  const statusCfg = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.PENDING;
+  const isCancellable =
+    order.subOrders?.every((s) => s.status === 'PLACED') &&
+    order.orderStatus === 'PENDING' &&
+    order.paymentStatus !== 'REFUNDED';
+
+  // Timeline step calculation
+  const currentStepIndex = STANDARD_STEPS.indexOf(currentStatus);
+  const isTerminalFailure = ['CANCELLED', 'RETURNED', 'REFUNDED', 'PAYMENT_FAILED'].includes(currentStatus);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -78,10 +139,20 @@ export const OrderDetailPage: React.FC = () => {
       {/* Header Card */}
       <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <span className="text-xs font-bold text-gray-400">Order Reference</span>
-          <h1 className="text-xl sm:text-2xl font-black text-gray-900 mt-0.5">#{order.id.slice(0, 8)}</h1>
-          <p className="text-xs text-gray-500 mt-1">
-            Confirmed on {new Date(order.createdAt).toLocaleString()}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-bold text-gray-400">Order Reference</span>
+            <span
+              className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
+            >
+              {statusCfg.label}
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 mt-1">#{order.id.slice(0, 8)}</h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Placed on {new Date(order.createdAt).toLocaleString()} • Payment:{' '}
+            <strong className={order.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-600'}>
+              {order.paymentStatus}
+            </strong>
           </p>
         </div>
 
@@ -102,79 +173,192 @@ export const OrderDetailPage: React.FC = () => {
             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl transition shadow-md flex items-center space-x-1.5"
           >
             <Download className="w-4 h-4" />
-            <span>Download PDF Invoice</span>
+            <span>Download Invoice</span>
           </button>
         </div>
       </div>
 
-      {/* Sub-Orders Lifecycle Breakdown */}
-      <div className="space-y-6">
-        <h2 className="text-lg font-bold text-gray-900">Vendor Sub-Orders & Fulfillment Status</h2>
-
-        {order.subOrders.map((sub) => {
-          const statuses: SubOrderStatus[] = ['PLACED', 'PACKED', 'SHIPPED', 'DELIVERED'];
-          const currentIndex = statuses.indexOf(sub.status);
-
-          return (
-            <div key={sub.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-gray-100 gap-2">
-                <div>
-                  <span className="text-xs font-bold text-blue-600 uppercase">Vendor Store</span>
-                  <h3 className="text-base font-extrabold text-gray-900">{sub.vendor?.storeName || 'Merchant'}</h3>
-                </div>
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-800 uppercase">
-                  Sub-Order Status: {sub.status}
-                </span>
-              </div>
-
-              {/* Status Timeline */}
-              {sub.status !== 'CANCELLED' ? (
-                <div className="relative py-4">
-                  <div className="flex items-center justify-between w-full">
-                    {statuses.map((step, idx) => {
-                      const isComplete = idx <= currentIndex;
-                      const isCurrent = idx === currentIndex;
-
-                      return (
-                        <div key={step} className="flex flex-col items-center flex-1 relative">
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition z-10 ${
-                              isComplete ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                            }`}
-                          >
-                            {isComplete ? '✓' : idx + 1}
-                          </div>
-                          <span className={`text-[11px] font-semibold mt-2 ${isCurrent ? 'text-blue-600' : 'text-gray-500'}`}>
-                            {step}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl font-medium">
-                  This sub-order was cancelled and inventory has been returned.
-                </div>
+      {/* Courier & Tracking Banner (if available) */}
+      {(order.courierName || order.trackingNumber) && (
+        <div className="mb-8 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
+              <Truck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-black tracking-wider text-blue-700 block">
+                Carrier & Tracking Details
+              </span>
+              <p className="text-sm font-bold text-gray-900 mt-0.5">
+                {order.courierName || 'Standard Express'}
+              </p>
+              {order.trackingNumber && (
+                <p className="text-xs font-mono text-gray-600 mt-0.5">
+                  Waybill / Tracking: <span className="font-bold text-gray-900">{order.trackingNumber}</span>
+                </p>
               )}
+            </div>
+          </div>
 
-              {/* Items in Sub-Order */}
-              <div className="divide-y divide-gray-100">
-                {sub.orderItems.map((item) => (
-                  <div key={item.id} className="py-2.5 flex justify-between items-center text-xs">
-                    <div>
-                      <span className="font-semibold text-gray-900">{item.titleSnapshot}</span>
-                      <p className="text-gray-400">Qty: {item.quantity}</p>
+          {order.trackingNumber && (
+            <button
+              onClick={handleCopyTracking}
+              className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 font-bold rounded-xl text-xs transition flex items-center space-x-1.5 shadow-sm"
+            >
+              {copiedTracking ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedTracking ? 'Copied' : 'Copy Tracking'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Interactive Delivery Lifecycle Stepper */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm mb-8 space-y-4">
+        <h2 className="text-sm font-black uppercase tracking-wider text-gray-900 flex items-center">
+          <Truck className="w-4 h-4 mr-2 text-blue-600" />
+          Live Order Tracking
+        </h2>
+
+        {isTerminalFailure ? (
+          <div className={`p-4 rounded-2xl border text-xs font-semibold flex items-center space-x-3 ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <div>
+              <span className="font-bold block text-sm">Order Status: {statusCfg.label}</span>
+              <p className="mt-0.5">
+                This order has entered status {statusCfg.label}. Please review the status history below or contact support if you need assistance.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="py-4">
+            <div className="flex items-center justify-between w-full relative">
+              {STANDARD_STEPS.map((step, idx) => {
+                const isComplete = currentStepIndex >= 0 && idx <= currentStepIndex;
+                const isCurrent = idx === currentStepIndex;
+
+                return (
+                  <div key={step} className="flex flex-col items-center flex-1 relative">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition z-10 ${
+                        isCurrent
+                          ? 'bg-blue-600 text-white ring-4 ring-blue-100 shadow-md'
+                          : isComplete
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-gray-100 text-gray-400 border border-gray-200'
+                      }`}
+                    >
+                      {isComplete && !isCurrent ? '✓' : idx + 1}
                     </div>
-                    <span className="font-bold text-gray-900">
-                      ${(Number(item.priceSnapshot) * item.quantity).toFixed(2)}
+                    <span
+                      className={`text-[10px] sm:text-xs font-bold mt-2 text-center ${
+                        isCurrent ? 'text-blue-600 font-black' : isComplete ? 'text-gray-800' : 'text-gray-400'
+                      }`}
+                    >
+                      {STATUS_CONFIG[step]?.label}
                     </span>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        )}
+      </div>
+
+      {/* Order Status History Timeline */}
+      {order.statusHistories && order.statusHistories.length > 0 && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm mb-8 space-y-4">
+          <h2 className="text-sm font-black uppercase tracking-wider text-gray-900 flex items-center">
+            <History className="w-4 h-4 mr-2 text-indigo-600" />
+            Order Timeline Updates
+          </h2>
+
+          <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
+            {order.statusHistories.map((h) => {
+              const cfg = STATUS_CONFIG[h.status] || STATUS_CONFIG.PENDING;
+              return (
+                <div key={h.id} className="relative space-y-1 text-xs">
+                  <div className={`absolute -left-6 top-1 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ${cfg.bg} ${cfg.text} flex items-center justify-center`}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${cfg.bg} ${cfg.text}`}>
+                      {cfg.label}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      {new Date(h.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  {h.note && <p className="text-xs text-gray-600 pl-0.5">{h.note}</p>}
+                  {h.trackingNumber && (
+                    <p className="text-[11px] font-mono text-blue-600">
+                      Carrier: {h.courierName || 'Express'} • Tracking: {h.trackingNumber}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Destination & Sub-Orders */}
+      <div className="space-y-6">
+        <h2 className="text-lg font-bold text-gray-900">Items & Merchant Packages</h2>
+
+        {order.subOrders?.map((sub) => (
+          <div key={sub.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+              <div>
+                <span className="text-xs font-bold text-blue-600 uppercase">Vendor Store</span>
+                <h3 className="text-base font-extrabold text-gray-900">{sub.vendor?.storeName || 'Merchant'}</h3>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-800 uppercase">
+                {sub.status}
+              </span>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              {sub.orderItems?.map((item) => (
+                <div key={item.id} className="py-2.5 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-semibold text-gray-900">{item.titleSnapshot}</span>
+                    <p className="text-gray-400">Qty: {item.quantity}</p>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    ${(Number(item.priceSnapshot) * item.quantity).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Shipping Address & Order Totals */}
+        {order.address && (
+          <div className="p-6 rounded-3xl bg-gray-50 border border-gray-200 text-xs text-gray-600 flex flex-col sm:flex-row justify-between gap-4">
+            <div className="space-y-1">
+              <span className="font-bold text-gray-900 uppercase text-[10px] flex items-center">
+                <MapPin className="w-3.5 h-3.5 mr-1 text-blue-600" /> Shipping Destination
+              </span>
+              <p className="text-gray-800 font-semibold">{order.address.line1}</p>
+              <p>
+                {order.address.city}, {order.address.state} {order.address.postalCode}
+              </p>
+              <p className="text-gray-400">Phone: {order.address.phone}</p>
+            </div>
+
+            <div className="sm:text-right space-y-1">
+              <span className="font-bold text-gray-900 uppercase text-[10px]">Payment Summary</span>
+              <p className="text-gray-500">Subtotal: ${Number(order.subtotal).toFixed(2)}</p>
+              {Number(order.discount) > 0 && (
+                <p className="text-emerald-600 font-bold">Discount: -${Number(order.discount).toFixed(2)}</p>
+              )}
+              <p className="text-base font-black text-gray-900 pt-1">
+                Total: <span className="text-blue-600">${Number(order.total).toFixed(2)}</span>
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

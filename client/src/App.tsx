@@ -28,6 +28,7 @@ import { VendorEarningsPage } from './pages/vendor/VendorEarningsPage.js';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.js';
 import { AdminVendorsPage } from './pages/admin/AdminVendorsPage.js';
 import { AdminCouponsPage } from './pages/admin/AdminCouponsPage.js';
+import { AdminOrdersPage } from './pages/admin/AdminOrdersPage.js';
 import { CartNotificationToast } from './components/cart/CartNotification.js';
 
 export const App: React.FC = () => {
@@ -129,6 +130,14 @@ export const App: React.FC = () => {
                   element={
                     <ProtectedRoute allowedRoles={['ADMIN']}>
                       <AdminDashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/orders"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <AdminOrdersPage />
                     </ProtectedRoute>
                   }
                 />

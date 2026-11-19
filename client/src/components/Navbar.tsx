@@ -121,12 +121,20 @@ export const Navbar: React.FC = () => {
                     )}
 
                     {user.role === 'ADMIN' && (
-                      <Link
-                        to="/admin/dashboard"
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        <ShieldAlert className="w-4 h-4 mr-2" /> Admin Dashboard
-                      </Link>
+                      <>
+                        <Link
+                          to="/admin/dashboard"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <ShieldAlert className="w-4 h-4 mr-2" /> Admin Dashboard
+                        </Link>
+                        <Link
+                          to="/admin/orders"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <Package className="w-4 h-4 mr-2 text-rose-600" /> Manage Orders
+                        </Link>
+                      </>
                     )}
 
                     <button
